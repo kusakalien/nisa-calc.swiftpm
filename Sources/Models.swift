@@ -110,6 +110,14 @@ final class NISAStore {
     func addEntry(_ entry: NISAEntry) { entries.append(entry) }
     func removeEntries(at offsets: IndexSet) { entries.remove(atOffsets: offsets) }
 
+    func updateEntry(id: UUID, type: NISAType, start: YearMonth, end: YearMonth, monthlyAmount: Int) {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        entries[index].type          = type
+        entries[index].start         = start
+        entries[index].end           = end
+        entries[index].monthlyAmount = monthlyAmount
+    }
+
     // MARK: - Calculation
 
     func calculateMonthlyData() -> [MonthlyDataPoint] {

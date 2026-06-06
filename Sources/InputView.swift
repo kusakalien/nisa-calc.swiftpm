@@ -3,6 +3,7 @@ import SwiftUI
 struct InputView: View {
     @Environment(NISAStore.self) private var store
     @State private var showingAddSheet = false
+    @State private var editingEntry: NISAEntry?
 
     var body: some View {
         NavigationStack {
@@ -17,6 +18,8 @@ struct InputView: View {
                     List {
                         ForEach(store.entries) { entry in
                             EntryRow(entry: entry)
+                                .contentShape(Rectangle())
+                                .onTapGesture { editingEntry = entry }
                         }
                         .onDelete { store.removeEntries(at: $0) }
                     }
@@ -37,7 +40,10 @@ struct InputView: View {
                 }
             }
             .sheet(isPresented: $showingAddSheet) {
-                AddEntrySheet()
+                EntrySheet(mode: .add)
+            }
+            .sheet(item: $editingEntry) { entry in
+                EntrySheet(mode: .edit(entry))
             }
         }
     }
@@ -64,19 +70,31 @@ private struct EntryRow: View {
 
             Spacer()
 
-            Text(entry.monthlyAmount.formatted(.currency(code: "JPY").precision(.fractionLength(0))) + "/月")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Text(entry.monthlyAmount.formatted(.currency(code: "JPY").precision(.fractionLength(0))) + "/月")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(.vertical, 4)
     }
 }
 
-// MARK: - AddEntrySheet
+// MARK: - EntrySheet
 
-struct AddEntrySheet: View {
+enum EntrySheetMode {
+    case add
+    case edit(NISAEntry)
+}
+
+struct EntrySheet: View {
     @Environment(NISAStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+
+    let mode: EntrySheetMode
 
     @State private var selectedType: NISAType = .tsumitate
     @State private var startYear  = 2024
@@ -86,10 +104,15 @@ struct AddEntrySheet: View {
     @State private var amountText = "100000"
     @State private var errorMessage: String?
 
-    private let years = Array(2024...2050)
+    private let years  = Array(2024...2050)
     private let months = Array(1...12)
 
     private var monthlyAmount: Int { Int(amountText) ?? 0 }
+
+    private var isEditing: Bool {
+        if case .edit = mode { return true }
+        return false
+    }
 
     var body: some View {
         NavigationStack {
@@ -147,7 +170,6 @@ struct AddEntrySheet: View {
                         TextField("例: 100000", text: $amountText)
                             .keyboardType(.numberPad)
                     }
-
                     limitHint
                 }
 
@@ -159,17 +181,18 @@ struct AddEntrySheet: View {
                     }
                 }
             }
-            .navigationTitle("積立プランを追加")
+            .navigationTitle(isEditing ? "積立プランを編集" : "積立プランを追加")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("追加") { addEntry() }
+                    Button(isEditing ? "保存" : "追加") { commit() }
                         .disabled(monthlyAmount <= 0)
                 }
             }
+            .onAppear { loadInitialValues() }
         }
     }
 
@@ -182,7 +205,17 @@ struct AddEntrySheet: View {
             .foregroundStyle(.secondary)
     }
 
-    private func addEntry() {
+    private func loadInitialValues() {
+        guard case .edit(let entry) = mode else { return }
+        selectedType = entry.type
+        startYear    = entry.start.year
+        startMonth   = entry.start.month
+        endYear      = entry.end.year
+        endMonth     = entry.end.month
+        amountText   = "\(entry.monthlyAmount)"
+    }
+
+    private func commit() {
         let start = YearMonth(year: startYear, month: startMonth)
         let end   = YearMonth(year: endYear,   month: endMonth)
 
@@ -195,13 +228,17 @@ struct AddEntrySheet: View {
             return
         }
 
-        let entry = NISAEntry(
-            type: selectedType,
-            start: start,
-            end: end,
-            monthlyAmount: monthlyAmount
-        )
-        store.addEntry(entry)
+        switch mode {
+        case .add:
+            store.addEntry(NISAEntry(
+                type: selectedType,
+                start: start,
+                end: end,
+                monthlyAmount: monthlyAmount
+            ))
+        case .edit(let original):
+            store.updateEntry(id: original.id, type: selectedType, start: start, end: end, monthlyAmount: monthlyAmount)
+        }
         dismiss()
     }
 }
