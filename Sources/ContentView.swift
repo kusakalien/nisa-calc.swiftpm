@@ -5,15 +5,12 @@ struct ContentView: View {
 
     var body: some View {
         TabView {
-            Tab("サマリー", systemImage: "chart.pie.fill") {
-                SummaryView()
-            }
-            Tab("グラフ", systemImage: "chart.line.uptrend.xyaxis") {
-                ChartView()
-            }
-            Tab("設定", systemImage: "gearshape.fill") {
-                InputView()
-            }
+            SummaryView()
+                .tabItem { Label("サマリー", systemImage: "chart.pie.fill") }
+            ChartView()
+                .tabItem { Label("グラフ", systemImage: "chart.line.uptrend.xyaxis") }
+            InputView()
+                .tabItem { Label("設定", systemImage: "gearshape.fill") }
         }
     }
 }

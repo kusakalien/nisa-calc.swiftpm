@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "NisaCalc",
     platforms: [
-        .iOS(.v18)
+        .iOS(.v17)
     ],
     targets: [
         .executableTarget(
