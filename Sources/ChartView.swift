@@ -242,3 +242,7 @@ private struct LegendItem: View {
 private extension Double {
     var wan: Double { self / 10_000 }
 }
+
+private extension Int {
+    var wan: Double { Double(self) / 10_000 }
+}
