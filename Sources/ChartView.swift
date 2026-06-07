@@ -17,6 +17,7 @@ enum BarGranularity: String, CaseIterable, Identifiable {
 struct ChartView: View {
     @Environment(NISAStore.self) private var store
     @State private var selectedPoint: MonthlyDataPoint?
+    @State private var selectedPointTitle: String?
     @State private var showTotal = true
     @State private var displayStyle: ChartDisplayStyle = .line
     @State private var barGranularity: BarGranularity = .yearly
@@ -55,8 +56,8 @@ struct ChartView: View {
             }
             .navigationTitle("積立グラフ")
             .navigationBarTitleDisplayMode(.large)
-            .onChange(of: displayStyle) { _, _ in selectedPoint = nil }
-            .onChange(of: barGranularity) { _, _ in selectedPoint = nil }
+            .onChange(of: displayStyle) { _, _ in clearSelection() }
+            .onChange(of: barGranularity) { _, _ in clearSelection() }
         }
     }
 
@@ -228,6 +229,11 @@ struct ChartView: View {
         let amount: Double
     }
 
+    private func yearEndPoint(for year: Int, in data: [MonthlyDataPoint]) -> MonthlyDataPoint? {
+        data.last(where: { $0.yearMonth.year == year && $0.yearMonth.month == 12 })
+            ?? data.last(where: { $0.yearMonth.year == year })
+    }
+
     private var stackedBarData: [StackedBar] {
         let data = chartData
         guard !data.isEmpty else { return [] }
@@ -238,9 +244,7 @@ struct ChartView: View {
         case .yearly:
             let years = Array(Set(data.map { $0.yearMonth.year })).sorted()
             for year in years {
-                let yearEnd = data.last(where: { $0.yearMonth.year == year && $0.yearMonth.month == 12 })
-                let fallback = data.last(where: { $0.yearMonth.year == year })
-                guard let point = yearEnd ?? fallback else { continue }
+                guard let point = yearEndPoint(for: year, in: data) else { continue }
                 result.append(StackedBar(label: "\(year)", date: point.date,
                                           typeLabel: NISAType.tsumitate.rawValue, amount: point.tsumitateTotal.wan))
                 result.append(StackedBar(label: "\(year)", date: point.date,
@@ -274,7 +278,7 @@ struct ChartView: View {
             }
 
             if let point = selectedPoint {
-                selectedDetailView(point)
+                selectedDetailView(point, title: selectedPointTitle)
             }
         }
         .padding()
@@ -320,7 +324,7 @@ struct ChartView: View {
                 Rectangle()
                     .fill(.clear)
                     .contentShape(Rectangle())
-                    .gesture(barSelectionGesture(proxy: proxy, geo: geo))
+                    .gesture(yearBarSelectionGesture(proxy: proxy, geo: geo))
             }
         }
         .frame(height: 320)
@@ -376,6 +380,7 @@ struct ChartView: View {
                             let x = location.x - geo[proxy.plotFrame!].origin.x
                             if let date: Date = proxy.value(atX: x) {
                                 selectedPoint = nearestPoint(to: date)
+                                selectedPointTitle = nil
                             }
                         }
                 }
@@ -396,9 +401,9 @@ struct ChartView: View {
         .font(.caption)
     }
 
-    private func selectedDetailView(_ point: MonthlyDataPoint) -> some View {
+    private func selectedDetailView(_ point: MonthlyDataPoint, title: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(point.yearMonth.displayString)
+            Text(title ?? point.yearMonth.displayString)
                 .font(.headline)
             HStack {
                 Circle().fill(.blue).frame(width: 8, height: 8)
@@ -427,15 +432,37 @@ struct ChartView: View {
         })
     }
 
+    private func clearSelection() {
+        selectedPoint = nil
+        selectedPointTitle = nil
+    }
+
+    /// 折れ線グラフ用: タップ位置に最も近い月をそのまま選択
     private func barSelectionGesture(proxy: ChartProxy, geo: GeometryProxy) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { drag in
                 let x = drag.location.x - geo[proxy.plotFrame!].origin.x
                 if let date: Date = proxy.value(atX: x) {
                     selectedPoint = nearestPoint(to: date)
+                    selectedPointTitle = nil
                 }
             }
-            .onEnded { _ in selectedPoint = nil }
+            .onEnded { _ in clearSelection() }
+    }
+
+    /// 年単位の積み上げ棒グラフ用: タップ位置の年に対応する「年末時点」のデータを選択
+    private func yearBarSelectionGesture(proxy: ChartProxy, geo: GeometryProxy) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { drag in
+                let x = drag.location.x - geo[proxy.plotFrame!].origin.x
+                guard let date: Date = proxy.value(atX: x) else { return }
+                let year = Calendar.current.component(.year, from: date)
+                if let point = yearEndPoint(for: year, in: chartData) {
+                    selectedPoint = point
+                    selectedPointTitle = "\(year)年"
+                }
+            }
+            .onEnded { _ in clearSelection() }
     }
 }
 
