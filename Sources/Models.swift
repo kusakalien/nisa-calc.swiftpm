@@ -73,16 +73,46 @@ struct YearMonth: Comparable, Hashable, Codable {
     var displayString: String { "\(year)年\(month)月" }
 }
 
+// MARK: - EndMode
+
+enum EndMode: Codable, Hashable {
+    case fixedDate(YearMonth)
+    case untilLimitReached
+}
+
 // MARK: - NISAEntry
 
 struct NISAEntry: Identifiable, Codable {
     var id = UUID()
     var type: NISAType
-    var start: YearMonth
-    var end: YearMonth
-    var monthlyAmount: Int
+    var isSpot: Bool = false       // true: スポット購入(個別株など)、false: 積立
+    var start: YearMonth           // 積立: 開始年月 / スポット: 購入年月
+    var endMode: EndMode = .fixedDate(YearMonth(year: 2024, month: 12))
+    var amount: Int                // 積立: 毎月の金額 / スポット: 購入金額
+    var memo: String = ""          // スポット購入時のメモ(銘柄など)
 
-    func covers(_ ym: YearMonth) -> Bool { start <= ym && ym <= end }
+    /// 日付範囲計算用の見積もり終了年月(「満額になるまで」の場合は概算)
+    var effectiveEnd: YearMonth {
+        if isSpot { return start }
+        switch endMode {
+        case .fixedDate(let end):
+            return end
+        case .untilLimitReached:
+            guard amount > 0 else { return start }
+            let months = (type.totalLimit + amount - 1) / amount
+            return start.advanced(by: max(0, months - 1))
+        }
+    }
+
+    func covers(_ ym: YearMonth) -> Bool {
+        if isSpot { return ym == start }
+        switch endMode {
+        case .fixedDate(let end):
+            return start <= ym && ym <= end
+        case .untilLimitReached:
+            return start <= ym
+        }
+    }
 }
 
 // MARK: - MonthlyDataPoint
@@ -110,12 +140,9 @@ final class NISAStore {
     func addEntry(_ entry: NISAEntry) { entries.append(entry) }
     func removeEntries(at offsets: IndexSet) { entries.remove(atOffsets: offsets) }
 
-    func updateEntry(id: UUID, type: NISAType, start: YearMonth, end: YearMonth, monthlyAmount: Int) {
-        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
-        entries[index].type          = type
-        entries[index].start         = start
-        entries[index].end           = end
-        entries[index].monthlyAmount = monthlyAmount
+    func updateEntry(_ entry: NISAEntry) {
+        guard let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
+        entries[index] = entry
     }
 
     // MARK: - Calculation
@@ -124,7 +151,7 @@ final class NISAStore {
         guard !entries.isEmpty else { return [] }
 
         guard let earliest = entries.map(\.start).min(),
-              let latest   = entries.map(\.end).max()
+              let latest   = entries.map(\.effectiveEnd).max()
         else { return [] }
 
         var result: [MonthlyDataPoint] = []
@@ -147,8 +174,8 @@ final class NISAStore {
 
             for entry in entries where entry.covers(ym) {
                 switch entry.type {
-                case .tsumitate: rawTsumitate += entry.monthlyAmount
-                case .growth:    rawGrowth    += entry.monthlyAmount
+                case .tsumitate: rawTsumitate += entry.amount
+                case .growth:    rawGrowth    += entry.amount
                 }
             }
 

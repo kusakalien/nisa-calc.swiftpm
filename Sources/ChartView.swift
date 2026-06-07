@@ -1,10 +1,17 @@
 import SwiftUI
 import Charts
 
+enum ChartDisplayStyle: String, CaseIterable, Identifiable {
+    case line       = "推移グラフ"
+    case stackedBar = "積み上げ棒グラフ"
+    var id: String { rawValue }
+}
+
 struct ChartView: View {
     @Environment(NISAStore.self) private var store
     @State private var selectedPoint: MonthlyDataPoint?
     @State private var showTotal = true
+    @State private var displayStyle: ChartDisplayStyle = .line
 
     private var chartData: [MonthlyDataPoint] { store.calculateMonthlyData() }
 
@@ -20,10 +27,16 @@ struct ChartView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 20) {
-                            toggleRow
-                            mainChart
+                            stylePicker
+                            switch displayStyle {
+                            case .line:
+                                toggleRow
+                                mainChart
+                            case .stackedBar:
+                                stackedBarChart
+                            }
                             legendView
-                            if let point = selectedPoint {
+                            if displayStyle == .line, let point = selectedPoint {
                                 selectedDetailView(point)
                             }
                         }
@@ -175,17 +188,90 @@ struct ChartView: View {
 
     // MARK: - Sub-views
 
+    private var stylePicker: some View {
+        Picker("表示形式", selection: $displayStyle) {
+            ForEach(ChartDisplayStyle.allCases) { style in
+                Text(style.rawValue).tag(style)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
     private var toggleRow: some View {
         Toggle("合計を表示", isOn: $showTotal)
             .tint(.purple)
             .padding(.horizontal)
     }
 
+    // MARK: - Stacked Bar Chart
+
+    private struct YearlyBar: Identifiable {
+        let id = UUID()
+        let year: Int
+        let typeLabel: String
+        let amount: Double
+        let color: Color
+    }
+
+    private var yearlyBarData: [YearlyBar] {
+        let data = chartData
+        guard !data.isEmpty else { return [] }
+
+        let years = Array(Set(data.map { $0.yearMonth.year })).sorted()
+        var result: [YearlyBar] = []
+
+        for year in years {
+            guard let point = data.last(where: { $0.yearMonth.year == year }) else { continue }
+            result.append(YearlyBar(
+                year: year,
+                typeLabel: NISAType.tsumitate.rawValue,
+                amount: point.tsumitateTotal.wan,
+                color: NISAType.tsumitate.color
+            ))
+            result.append(YearlyBar(
+                year: year,
+                typeLabel: NISAType.growth.rawValue,
+                amount: point.growthTotal.wan,
+                color: NISAType.growth.color
+            ))
+        }
+        return result
+    }
+
+    private var stackedBarChart: some View {
+        Chart(yearlyBarData) { bar in
+            BarMark(
+                x: .value("年", String(bar.year)),
+                y: .value("金額(万円)", bar.amount)
+            )
+            .foregroundStyle(by: .value("種類", bar.typeLabel))
+            .annotation(position: .top) { }
+        }
+        .chartForegroundStyleScale([
+            NISAType.tsumitate.rawValue: NISAType.tsumitate.color,
+            NISAType.growth.rawValue:    NISAType.growth.color
+        ])
+        .chartYAxis {
+            AxisMarks { value in
+                AxisGridLine()
+                AxisTick()
+                AxisValueLabel {
+                    if let v = value.as(Double.self) {
+                        Text("\(Int(v))万")
+                    }
+                }
+            }
+        }
+        .frame(height: 320)
+        .padding()
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+
     private var legendView: some View {
         HStack(spacing: 20) {
             LegendItem(color: .blue,   label: NISAType.tsumitate.rawValue)
             LegendItem(color: .green,  label: NISAType.growth.rawValue)
-            if showTotal {
+            if displayStyle == .line && showTotal {
                 LegendItem(color: .purple, label: "合計")
             }
         }
