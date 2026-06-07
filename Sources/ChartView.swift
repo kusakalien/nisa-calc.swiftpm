@@ -307,7 +307,7 @@ struct ChartView: View {
                 BarMark(
                     x: .value("年月", bar.date, unit: .month),
                     y: .value("金額(万円)", bar.amount),
-                    width: .fixed(18)
+                    width: .fixed(14)
                 )
                 .foregroundStyle(by: .value("種類", bar.typeLabel))
             }
@@ -316,13 +316,16 @@ struct ChartView: View {
                 NISAType.growth.rawValue:    NISAType.growth.color
             ])
             .chartXAxis {
-                AxisMarks(values: .stride(by: .month)) { value in
+                AxisMarks(values: .stride(by: .month, count: 3)) { value in
                     AxisGridLine()
                     AxisTick()
                     AxisValueLabel {
                         if let date = value.as(Date.self) {
                             let c = Calendar.current
                             Text("\(c.component(.year, from: date))/\(c.component(.month, from: date))")
+                                .font(.system(size: 9))
+                                .fixedSize()
+                                .rotationEffect(.degrees(-45))
                         }
                     }
                 }
@@ -338,8 +341,8 @@ struct ChartView: View {
                     }
                 }
             }
-            .frame(width: max(400, CGFloat(stackedBarData.count / 2) * 28))
-            .frame(height: 280)
+            .frame(width: max(400, CGFloat(stackedBarData.count / 2) * 32))
+            .frame(height: 300)
         }
     }
 
