@@ -166,6 +166,20 @@ struct EntrySheet: View {
         selectedType == .growth && purchaseMode == .spot
     }
 
+    private var editingEntryID: UUID? {
+        if case .edit(let original) = mode { return original.id }
+        return nil
+    }
+
+    /// 同じ投資枠で「満額になるまで」が既に設定済みか(編集中の本人は除く)
+    private var untilLimitUnavailable: Bool {
+        store.entries.contains { existing in
+            existing.id != editingEntryID
+                && existing.type == selectedType
+                && existing.endMode == .untilLimitReached
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -199,6 +213,9 @@ struct EntrySheet: View {
             .onAppear { loadInitialValues() }
             .onChange(of: selectedType) { _, newValue in
                 if newValue == .tsumitate { purchaseMode = .recurring }
+                if endChoice == .untilLimit && untilLimitUnavailable {
+                    endChoice = .fixedDate
+                }
             }
         }
     }
@@ -251,7 +268,9 @@ struct EntrySheet: View {
 
         Section("終了年月") {
             Picker("終了の指定方法", selection: $endChoice) {
-                ForEach(EndChoice.allCases) { Text($0.rawValue).tag($0) }
+                ForEach(EndChoice.allCases) { choice in
+                    Text(choice.rawValue).tag(choice)
+                }
             }
             .pickerStyle(.segmented)
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -263,6 +282,12 @@ struct EntrySheet: View {
                 Text("生涯非課税保有限度額(\(selectedType.totalLimit.manEnDisplay))に達するまで毎月積み立てます")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            if untilLimitUnavailable {
+                Text("「満額になるまで」は\(selectedType.rawValue)につき既に設定済みです(1つまで)")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
             }
         }
 
@@ -341,6 +366,8 @@ struct EntrySheet: View {
         let start = YearMonth(year: startYear, month: startMonth)
         let isSpot = isSpotMode
 
+        let entryID = editingEntryID ?? UUID()
+
         let endMode: EndMode
         if isSpot {
             endMode = .fixedDate(start)
@@ -354,14 +381,13 @@ struct EntrySheet: View {
                 }
                 endMode = .fixedDate(end)
             case .untilLimit:
+                guard !untilLimitUnavailable else {
+                    errorMessage = "「満額になるまで」は\(selectedType.rawValue)につき1つまでしか設定できません"
+                    return
+                }
                 endMode = .untilLimitReached
             }
         }
-
-        let entryID: UUID = {
-            if case .edit(let original) = mode { return original.id }
-            return UUID()
-        }()
 
         let entry = NISAEntry(
             id: entryID,
