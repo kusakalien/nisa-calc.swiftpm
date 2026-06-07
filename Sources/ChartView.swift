@@ -40,12 +40,13 @@ struct ChartView: View {
                             case .line:
                                 toggleRow
                                 mainChart
+                                legendView
+                                if let point = selectedPoint {
+                                    selectedDetailView(point)
+                                }
                             case .stackedBar:
                                 stackedBarChart
-                            }
-                            legendView
-                            if displayStyle == .line, let point = selectedPoint {
-                                selectedDetailView(point)
+                                legendView
                             }
                         }
                         .padding()
@@ -54,6 +55,8 @@ struct ChartView: View {
             }
             .navigationTitle("積立グラフ")
             .navigationBarTitleDisplayMode(.large)
+            .onChange(of: displayStyle) { _, _ in selectedPoint = nil }
+            .onChange(of: barGranularity) { _, _ in selectedPoint = nil }
         }
     }
 
@@ -267,6 +270,10 @@ struct ChartView: View {
             case .monthly:
                 monthlyBarChart
             }
+
+            if let point = selectedPoint {
+                selectedDetailView(point)
+            }
         }
         .padding()
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -304,6 +311,14 @@ struct ChartView: View {
                         Text(String(Int(v)) + "万")
                     }
                 }
+            }
+        }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .gesture(barSelectionGesture(proxy: proxy, geo: geo))
             }
         }
         .frame(height: 320)
@@ -348,6 +363,14 @@ struct ChartView: View {
                             Text(String(Int(v)) + "万")
                         }
                     }
+                }
+            }
+            .chartOverlay { proxy in
+                GeometryReader { geo in
+                    Rectangle()
+                        .fill(.clear)
+                        .contentShape(Rectangle())
+                        .gesture(barSelectionGesture(proxy: proxy, geo: geo))
                 }
             }
             .frame(width: max(400, CGFloat(stackedBarData.count / 2) * 32))
@@ -395,6 +418,17 @@ struct ChartView: View {
         chartData.min(by: {
             abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
         })
+    }
+
+    private func barSelectionGesture(proxy: ChartProxy, geo: GeometryProxy) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { drag in
+                let x = drag.location.x - geo[proxy.plotFrame!].origin.x
+                if let date: Date = proxy.value(atX: x) {
+                    selectedPoint = nearestPoint(to: date)
+                }
+            }
+            .onEnded { _ in selectedPoint = nil }
     }
 }
 
