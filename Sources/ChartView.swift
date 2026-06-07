@@ -257,47 +257,90 @@ struct ChartView: View {
             }
             .pickerStyle(.segmented)
 
-            ScrollView(.horizontal, showsIndicators: barGranularity == .monthly) {
-                Chart(stackedBarData) { bar in
-                    BarMark(
-                        x: .value("年月", bar.date, unit: barGranularity == .yearly ? .year : .month),
-                        y: .value("金額(万円)", bar.amount),
-                        width: barGranularity == .yearly ? .automatic : .fixed(18)
-                    )
-                    .foregroundStyle(by: .value("種類", bar.typeLabel))
-                }
-                .chartForegroundStyleScale([
-                    NISAType.tsumitate.rawValue: NISAType.tsumitate.color,
-                    NISAType.growth.rawValue:    NISAType.growth.color
-                ])
-                .chartXAxis {
-                    AxisMarks(values: .stride(by: barGranularity == .yearly ? .year : .month)) { value in
-                        AxisGridLine()
-                        AxisTick()
-                        AxisValueLabel(format: barGranularity == .yearly ? .dateTime.year() : .dateTime.year().month())
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks { value in
-                        AxisGridLine()
-                        AxisTick()
-                        AxisValueLabel {
-                            if let v = value.as(Double.self) {
-                                Text("\(Int(v))万")
-                            }
-                        }
-                    }
-                }
-                .frame(
-                    width: barGranularity == .monthly
-                        ? max(400, CGFloat(stackedBarData.count / 2) * 28)
-                        : nil
-                )
-                .frame(height: 280)
+            switch barGranularity {
+            case .yearly:
+                yearlyBarChart
+            case .monthly:
+                monthlyBarChart
             }
         }
         .padding()
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var yearlyBarChart: some View {
+        Chart(stackedBarData) { bar in
+            BarMark(
+                x: .value("年", bar.date, unit: .year),
+                y: .value("金額(万円)", bar.amount)
+            )
+            .foregroundStyle(by: .value("種類", bar.typeLabel))
+        }
+        .chartForegroundStyleScale([
+            NISAType.tsumitate.rawValue: NISAType.tsumitate.color,
+            NISAType.growth.rawValue:    NISAType.growth.color
+        ])
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .year)) { value in
+                AxisGridLine()
+                AxisTick()
+                AxisValueLabel(format: .dateTime.year())
+            }
+        }
+        .chartYAxis {
+            AxisMarks { value in
+                AxisGridLine()
+                AxisTick()
+                AxisValueLabel {
+                    if let v = value.as(Double.self) {
+                        Text("\(Int(v))万")
+                    }
+                }
+            }
+        }
+        .frame(height: 320)
+    }
+
+    private var monthlyBarChart: some View {
+        ScrollView(.horizontal, showsIndicators: true) {
+            Chart(stackedBarData) { bar in
+                BarMark(
+                    x: .value("年月", bar.date, unit: .month),
+                    y: .value("金額(万円)", bar.amount),
+                    width: .fixed(18)
+                )
+                .foregroundStyle(by: .value("種類", bar.typeLabel))
+            }
+            .chartForegroundStyleScale([
+                NISAType.tsumitate.rawValue: NISAType.tsumitate.color,
+                NISAType.growth.rawValue:    NISAType.growth.color
+            ])
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .month)) { value in
+                    AxisGridLine()
+                    AxisTick()
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            let c = Calendar.current
+                            Text("\(c.component(.year, from: date))/\(c.component(.month, from: date))")
+                        }
+                    }
+                }
+            }
+            .chartYAxis {
+                AxisMarks { value in
+                    AxisGridLine()
+                    AxisTick()
+                    AxisValueLabel {
+                        if let v = value.as(Double.self) {
+                            Text("\(Int(v))万")
+                        }
+                    }
+                }
+            }
+            .frame(width: max(400, CGFloat(stackedBarData.count / 2) * 28))
+            .frame(height: 280)
+        }
     }
 
     private var legendView: some View {
