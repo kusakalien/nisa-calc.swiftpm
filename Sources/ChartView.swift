@@ -7,11 +7,19 @@ enum ChartDisplayStyle: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum BarGranularity: String, CaseIterable, Identifiable {
+    case yearly  = "年単位"
+    case monthly = "月単位"
+    var id: String { rawValue }
+}
+
+
 struct ChartView: View {
     @Environment(NISAStore.self) private var store
     @State private var selectedPoint: MonthlyDataPoint?
     @State private var showTotal = true
     @State private var displayStyle: ChartDisplayStyle = .line
+    @State private var barGranularity: BarGranularity = .yearly
 
     private var chartData: [MonthlyDataPoint] { store.calculateMonthlyData() }
 
@@ -205,64 +213,89 @@ struct ChartView: View {
 
     // MARK: - Stacked Bar Chart
 
-    private struct YearlyBar: Identifiable {
+    private struct StackedBar: Identifiable {
         let id = UUID()
-        let year: Int
+        let label: String
+        let date: Date
         let typeLabel: String
         let amount: Double
-        let color: Color
     }
 
-    private var yearlyBarData: [YearlyBar] {
+    private var stackedBarData: [StackedBar] {
         let data = chartData
         guard !data.isEmpty else { return [] }
 
-        let years = Array(Set(data.map { $0.yearMonth.year })).sorted()
-        var result: [YearlyBar] = []
+        var result: [StackedBar] = []
 
-        for year in years {
-            guard let point = data.last(where: { $0.yearMonth.year == year }) else { continue }
-            result.append(YearlyBar(
-                year: year,
-                typeLabel: NISAType.tsumitate.rawValue,
-                amount: point.tsumitateTotal.wan,
-                color: NISAType.tsumitate.color
-            ))
-            result.append(YearlyBar(
-                year: year,
-                typeLabel: NISAType.growth.rawValue,
-                amount: point.growthTotal.wan,
-                color: NISAType.growth.color
-            ))
+        switch barGranularity {
+        case .yearly:
+            let years = Array(Set(data.map { $0.yearMonth.year })).sorted()
+            for year in years {
+                guard let point = data.last(where: { $0.yearMonth.year == year }) else { continue }
+                result.append(StackedBar(label: "\(year)", date: point.date,
+                                          typeLabel: NISAType.tsumitate.rawValue, amount: point.tsumitateTotal.wan))
+                result.append(StackedBar(label: "\(year)", date: point.date,
+                                          typeLabel: NISAType.growth.rawValue, amount: point.growthTotal.wan))
+            }
+        case .monthly:
+            for point in data {
+                result.append(StackedBar(label: point.yearMonth.displayString, date: point.date,
+                                          typeLabel: NISAType.tsumitate.rawValue, amount: point.tsumitateTotal.wan))
+                result.append(StackedBar(label: point.yearMonth.displayString, date: point.date,
+                                          typeLabel: NISAType.growth.rawValue, amount: point.growthTotal.wan))
+            }
         }
         return result
     }
 
     private var stackedBarChart: some View {
-        Chart(yearlyBarData) { bar in
-            BarMark(
-                x: .value("年", String(bar.year)),
-                y: .value("金額(万円)", bar.amount)
-            )
-            .foregroundStyle(by: .value("種類", bar.typeLabel))
-            .annotation(position: .top) { }
-        }
-        .chartForegroundStyleScale([
-            NISAType.tsumitate.rawValue: NISAType.tsumitate.color,
-            NISAType.growth.rawValue:    NISAType.growth.color
-        ])
-        .chartYAxis {
-            AxisMarks { value in
-                AxisGridLine()
-                AxisTick()
-                AxisValueLabel {
-                    if let v = value.as(Double.self) {
-                        Text("\(Int(v))万")
-                    }
+        VStack(spacing: 12) {
+            Picker("単位", selection: $barGranularity) {
+                ForEach(BarGranularity.allCases) { g in
+                    Text(g.rawValue).tag(g)
                 }
             }
+            .pickerStyle(.segmented)
+
+            ScrollView(.horizontal, showsIndicators: barGranularity == .monthly) {
+                Chart(stackedBarData) { bar in
+                    BarMark(
+                        x: .value("年月", bar.date, unit: barGranularity == .yearly ? .year : .month),
+                        y: .value("金額(万円)", bar.amount),
+                        width: barGranularity == .yearly ? .automatic : .fixed(18)
+                    )
+                    .foregroundStyle(by: .value("種類", bar.typeLabel))
+                }
+                .chartForegroundStyleScale([
+                    NISAType.tsumitate.rawValue: NISAType.tsumitate.color,
+                    NISAType.growth.rawValue:    NISAType.growth.color
+                ])
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: barGranularity == .yearly ? .year : .month)) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel(format: barGranularity == .yearly ? .dateTime.year() : .dateTime.year().month())
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel {
+                            if let v = value.as(Double.self) {
+                                Text("\(Int(v))万")
+                            }
+                        }
+                    }
+                }
+                .frame(
+                    width: barGranularity == .monthly
+                        ? max(400, CGFloat(stackedBarData.count / 2) * 28)
+                        : nil
+                )
+                .frame(height: 280)
+            }
         }
-        .frame(height: 320)
         .padding()
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
