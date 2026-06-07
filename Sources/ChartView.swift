@@ -158,7 +158,11 @@ struct ChartView: View {
             AxisMarks(values: .stride(by: .year)) { value in
                 AxisGridLine()
                 AxisTick()
-                AxisValueLabel(format: .dateTime.year())
+                AxisValueLabel {
+                    if let date = value.as(Date.self) {
+                        Text(String(Calendar.current.component(.year, from: date)))
+                    }
+                }
             }
         }
         .chartYAxis {
@@ -284,7 +288,11 @@ struct ChartView: View {
             AxisMarks(values: .stride(by: .year)) { value in
                 AxisGridLine()
                 AxisTick()
-                AxisValueLabel(format: .dateTime.year())
+                AxisValueLabel {
+                    if let date = value.as(Date.self) {
+                        Text(String(Calendar.current.component(.year, from: date)))
+                    }
+                }
             }
         }
         .chartYAxis {
