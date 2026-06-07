@@ -238,7 +238,9 @@ struct ChartView: View {
         case .yearly:
             let years = Array(Set(data.map { $0.yearMonth.year })).sorted()
             for year in years {
-                guard let point = data.last(where: { $0.yearMonth.year == year }) else { continue }
+                let yearEnd = data.last(where: { $0.yearMonth.year == year && $0.yearMonth.month == 12 })
+                let fallback = data.last(where: { $0.yearMonth.year == year })
+                guard let point = yearEnd ?? fallback else { continue }
                 result.append(StackedBar(label: "\(year)", date: point.date,
                                           typeLabel: NISAType.tsumitate.rawValue, amount: point.tsumitateTotal.wan))
                 result.append(StackedBar(label: "\(year)", date: point.date,
@@ -370,7 +372,12 @@ struct ChartView: View {
                     Rectangle()
                         .fill(.clear)
                         .contentShape(Rectangle())
-                        .gesture(barSelectionGesture(proxy: proxy, geo: geo))
+                        .onTapGesture { location in
+                            let x = location.x - geo[proxy.plotFrame!].origin.x
+                            if let date: Date = proxy.value(atX: x) {
+                                selectedPoint = nearestPoint(to: date)
+                            }
+                        }
                 }
             }
             .frame(width: max(400, CGFloat(stackedBarData.count / 2) * 32))
