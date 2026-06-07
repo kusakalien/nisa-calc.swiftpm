@@ -167,7 +167,7 @@ struct ChartView: View {
                 AxisTick()
                 AxisValueLabel {
                     if let v = value.as(Double.self) {
-                        Text("\(Int(v))万")
+                        Text(String(Int(v)) + "万")
                     }
                 }
             }
@@ -293,7 +293,7 @@ struct ChartView: View {
                 AxisTick()
                 AxisValueLabel {
                     if let v = value.as(Double.self) {
-                        Text("\(Int(v))万")
+                        Text(String(Int(v)) + "万")
                     }
                 }
             }
@@ -322,7 +322,8 @@ struct ChartView: View {
                     AxisValueLabel {
                         if let date = value.as(Date.self) {
                             let c = Calendar.current
-                            Text("\(c.component(.year, from: date))/\(c.component(.month, from: date))")
+                            let label = "\(String(c.component(.year, from: date)))/\(String(c.component(.month, from: date)))"
+                            Text(label)
                                 .font(.system(size: 9))
                                 .fixedSize()
                                 .rotationEffect(.degrees(-45))
@@ -336,7 +337,7 @@ struct ChartView: View {
                     AxisTick()
                     AxisValueLabel {
                         if let v = value.as(Double.self) {
-                            Text("\(Int(v))万")
+                            Text(String(Int(v)) + "万")
                         }
                     }
                 }
