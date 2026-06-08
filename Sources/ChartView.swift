@@ -165,6 +165,9 @@ struct ChartView: View {
                 AxisValueLabel {
                     if let date = value.as(Date.self) {
                         Text(String(Calendar.current.component(.year, from: date)))
+                            .font(.system(size: 9))
+                            .fixedSize()
+                            .rotationEffect(.degrees(-45))
                     }
                 }
             }
@@ -304,6 +307,9 @@ struct ChartView: View {
                 AxisValueLabel {
                     if let date = value.as(Date.self) {
                         Text(String(Calendar.current.component(.year, from: date)))
+                            .font(.system(size: 9))
+                            .fixedSize()
+                            .rotationEffect(.degrees(-45))
                     }
                 }
             }
