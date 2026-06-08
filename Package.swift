@@ -13,6 +13,8 @@ let package = Package(
             bundleIdentifier: "com.kusakalien.nisacalc",
             displayVersion: "1.0",
             bundleVersion: "1",
+            appIcon: .placeholder(icon: .calculator),
+            accentColor: .presetColor(.green),
             supportedDeviceFamilies: [.pad, .phone],
             supportedInterfaceOrientations: [.portrait, .landscapeLeft, .landscapeRight]
         )
