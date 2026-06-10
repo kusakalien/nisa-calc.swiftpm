@@ -1,0 +1,31 @@
+{
+  "identifier" : "A1B2C3D4",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "480",
+      "familyShareable" : false,
+      "internalID" : "RETURN_SIM_001",
+      "localizations" : [
+        {
+          "description" : "想定年利を設定して、毎月の積立を複利運用した場合の将来評価額をグラフで確認できます。",
+          "displayName" : "運用益シミュレーション",
+          "locale" : "ja_JP"
+        }
+      ],
+      "productID" : "com.kusakalien.nisacalc.returnsimulation",
+      "referenceName" : "運用益シミュレーション",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_compatibilityTimeRate" : {
+      "enabled" : false
+    }
+  },
+  "subscriptionGroups" : [],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

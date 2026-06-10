@@ -127,6 +127,19 @@ struct MonthlyDataPoint: Identifiable {
     var date: Date { yearMonth.date }
 }
 
+// MARK: - ProjectionPoint
+
+/// 運用益シミュレーション結果の各月のデータ
+struct ProjectionPoint: Identifiable {
+    let id = UUID()
+    let yearMonth: YearMonth
+    let principal: Double   // 投資元本(累計)
+    let value: Double       // 運用後の評価額(複利)
+    var gain: Double { value - principal }  // 運用益
+
+    var date: Date { yearMonth.date }
+}
+
 // MARK: - NISAStore
 
 @Observable
@@ -204,6 +217,35 @@ final class NISAStore {
             ym = ym.next()
         }
 
+        return result
+    }
+
+    /// 想定年利(%)をもとに、毎月の積立元本を複利運用した場合の評価額を計算する
+    /// - Parameter annualRatePercent: 想定年利(%)。例: 5.0
+    /// - Returns: 各月の元本・評価額の推移
+    func calculateProjection(annualRatePercent: Double) -> [ProjectionPoint] {
+        let monthlyData = calculateMonthlyData()
+        guard !monthlyData.isEmpty else { return [] }
+
+        let monthlyRate = annualRatePercent / 100.0 / 12.0
+
+        var value = 0.0
+        var previousPrincipal = 0.0
+        var result: [ProjectionPoint] = []
+
+        for point in monthlyData {
+            // その月に新たに投じられた元本
+            let contribution = max(0, point.total - previousPrincipal)
+            // 前月までの評価額を1か月分運用し、当月の積立を加える
+            value = value * (1 + monthlyRate) + contribution
+            previousPrincipal = point.total
+
+            result.append(ProjectionPoint(
+                yearMonth: point.yearMonth,
+                principal: point.total,
+                value: value
+            ))
+        }
         return result
     }
 
