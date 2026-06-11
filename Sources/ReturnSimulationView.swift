@@ -218,6 +218,13 @@ private struct PaywallView: View {
 
                 purchaseButton
 
+                if storeManager.product == nil && !storeManager.isProcessing {
+                    Button("再読み込み") {
+                        Task { await storeManager.loadProducts() }
+                    }
+                    .font(.subheadline)
+                }
+
                 Button("購入を復元") {
                     Task { await storeManager.restore() }
                 }
@@ -239,6 +246,11 @@ private struct PaywallView: View {
                     .padding(.horizontal)
             }
             .padding(.bottom, 32)
+        }
+        .task {
+            if storeManager.product == nil {
+                await storeManager.loadProducts()
+            }
         }
     }
 

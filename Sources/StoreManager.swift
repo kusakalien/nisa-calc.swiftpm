@@ -39,11 +39,15 @@ final class StoreManager {
 
     @MainActor
     func loadProducts() async {
+        errorMessage = nil
         do {
             let products = try await Product.products(for: [Self.returnSimulationProductID])
             product = products.first
+            if product == nil {
+                errorMessage = "商品情報を取得できませんでした。時間をおいて「再読み込み」をお試しください"
+            }
         } catch {
-            errorMessage = "商品情報の取得に失敗しました"
+            errorMessage = "商品情報の取得に失敗しました。時間をおいて「再読み込み」をお試しください"
         }
     }
 
